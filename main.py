@@ -15,7 +15,7 @@ def backward_recursion(adaptive_offset:bool,trng:np.ndarray, b_res:np.ndarray,si
     for i in range(n):
         if adaptive_offset and i > 0:
             par_offset = (b_res[i]-b_res[i-1])/1.1 # Seems to work nicely
-        b_res[i+1]=newton(calc_step,b_res[i]+par_offset,args = (i+1,trng,b_res,sigma,r,K,T,n))
+        b_res[i+1]=newton(calc_step,b_res[i]+par_offset,args = (i+1,trng,b_res,sigma,r,K,T,n),maxiter=100)
     
     return b_res
 

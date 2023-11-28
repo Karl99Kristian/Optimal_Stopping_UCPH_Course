@@ -14,7 +14,7 @@ def helper_mesh(i,j,trng,b_res,sigma,r):
     b1 = b_res[i]
     t2 = trng[j]
     b2 = b_res[j]
-    return norm.cdf(1/(sigma*np.sqrt(t2-t1))*(np.log(b2/b1)-(r-sigma**2/2)*(t2-t1)))
+    return np.exp(-r*(t2-t1))*norm.cdf(1/(sigma*np.sqrt(t2-t1))*(np.log(b2/b1)-(r-sigma**2/2)*(t2-t1)))
 
 def helper_vec(t1:float, t2:np.ndarray,b1:float,b2:np.ndarray,sigma:float,r:float):
     res = np.zeros_like(t2)
@@ -36,8 +36,8 @@ def calc_step(bt: float, i:int, trng:np.ndarray, b_res:np.ndarray,sigma:float, r
     Gs = r*K*helper_vec(t,trng[:i+1],bt,b_res[:i+1],sigma,r)
 
     Gs[0]=Gs[0]/2
-    Gs[-1]=Gs[-1]/2
-
+    Gs[-1]=(r*K/2)/2
+    
     int_G = np.sum(Gs)*T/n
 
     # Return whether fixed point or backward
@@ -52,15 +52,21 @@ def calc_step(bt: float, i:int, trng:np.ndarray, b_res:np.ndarray,sigma:float, r
 
 def calc_G_mat(b_res,trng,K,r,sigma,n):
     idx = np.linspace(0,n,n+1,dtype=int)
-    jdx = np.linspace(0,n,n,dtype=int)
+    jdx = np.linspace(0,n,n+1,dtype=int)
     I,J = np.meshgrid(idx,jdx)
-    G = np.nan_to_num(r*K*helper_mesh(I,J,trng,b_res,sigma,r))
-    
+    G = np.nan_to_num(r*K*helper_mesh(I,J,trng,b_res,sigma,r)).T
+
+    # add diag elements
+    gii = np.zeros((n,n+1))
+    gii[:,:-1]=np.identity(n)*(r*K/2)/2
+
+    G = G + np.identity(n+1)*(r*K/2)/2
+
     return G
 
 def picard_step(b_res,trng,K,r,sigma,T,n):
     G = calc_G_mat(b_res,trng,K,r,sigma,n)
     w = np.ones_like(trng)*T/n
-    w[-1] = w[-1]/2
+    w[0] = w[0]/2
     a=[g(trng[i+1],b_res[i+1],sigma,r,T,K) for i in range(n)]
-    return K-np.matmul(G,w)-a
+    return K-np.matmul(G,w)[1:]-a
