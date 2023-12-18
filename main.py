@@ -9,7 +9,6 @@ from itertools import repeat
 import time
 
 
-
 def backward_recursion(adaptive_offset:bool,trng:np.ndarray, b_res:np.ndarray,sigma:float, r:float,K:float,T:float,n:int):
     par_offset=0
     for i in range(n):
@@ -24,16 +23,6 @@ def picard_iteration(type:int, b_res_mat:np.ndarray,numiter:int, trng:np.ndarray
     for j in range(numiter-1):
         for i in range(n):
             b_res_mat[i+1,j+1]=calc_step(b_res_mat[i+1,j],i+1,trng,b_res_mat[:,j],sigma,r,K,T,n,fp=type)
-    return b_res_mat
-
-def picard_iteration_pythonic(b_res_mat:np.ndarray,numiter:int, trng:np.ndarray, sigma:float, r:float,K:float,T:float,n:int):
-    """
-    A more pythonic implementation, avoiding the inner loop. 
-    However no speedup compared to `picard_iteration` 
-    """
-    for j in range(numiter-1):
-        b_res_mat[1:,j+1]=picard_step(b_res_mat[:,j],trng,K,r,sigma,T,n)
-            
     return b_res_mat
 
 def picard_iteration_parallel(type:int, b_res_mat:np.ndarray,numiter:int, trng:np.ndarray, sigma:float, r:float,K:float,T:float,n:int):
@@ -68,9 +57,6 @@ if __name__=="__main__":
     n = 400
     trng = np.arange(0,T+T/n,T/n)[::-1]
 
-    #### Choose mthd ####
-    use_bw = False
-
     #### Recursion setup ####
     adaptive_offset = True
     b_res = np.ones_like(trng)*K
@@ -85,6 +71,8 @@ if __name__=="__main__":
     else:
         b_res_mat = np.ones((n+1,numiter))*K
 
+    b_res_mat_par = b_res_mat.copy()
+    b_res_mat_par_safe = b_res_mat.copy()
     
 
     # Backward Recursion
@@ -99,36 +87,23 @@ if __name__=="__main__":
     end = time.perf_counter()
     print("picard = {}ms".format((end - start)*1000))   
 
-    # Pythonic way of picard(has division errors that we ignore)
-    import warnings
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        start = time.perf_counter()
-        res_python = picard_iteration_pythonic(b_res_mat, numiter,trng,sigma,r,K,T,n)
-        end = time.perf_counter()
-        print("picard(pythonic) = {}ms".format((end - start)*1000))   
-
-    assert  (abs(res_p[:,-1]-res_python[:,-1])<1e-7).all()
-
-    
     # Picard iteration with parallel
     start = time.perf_counter()
-    res_par = picard_iteration_parallel(type,b_res_mat, numiter,trng,sigma,r,K,T,n)
+    b_res_mat_par = picard_iteration_parallel(type,b_res_mat_par, numiter,trng,sigma,r,K,T,n)
     end = time.perf_counter()
     print("picard(Parallel) = {}ms".format((end - start)*1000))   
 
     # Picard iteration with parallel (safe)
     start = time.perf_counter()
-    res_par = picard_iteration_parallel_safe(type,b_res_mat, numiter,trng,sigma,r,K,T,n)
+    b_res_mat_par_safe = picard_iteration_parallel_safe(type,b_res_mat_par_safe, numiter,trng,sigma,r,K,T,n)
     end = time.perf_counter()
     print("picard(Parallel(safe)) = {}ms".format((end - start)*1000))   
 
     # Calulate the price
-    print("\nprice: {}".format(calc_price(x0,res_par[:,-1],trng,sigma,r,K,T,n)))
-
+    print("\nprice: {}".format(calc_price(x0,res_p[:,-1],trng,sigma,r,K,T,n)))
+    
     assert  (abs(res_bw-res_p[:,-1])<0.1).all()
-    assert  (abs(res_par[:,-1]-res_p[:,-1])<1e-7).all()
+    assert  (abs(b_res_mat_par[:,-1]-res_p[:,-1])<1e-7).all()
 
 
  
